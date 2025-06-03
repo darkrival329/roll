@@ -1,0 +1,6 @@
+target_branch: main
+gitlab_url: https://gitlab.simulogix.com
+feature_branch: vdd
+auto_discover:
+  group: "siac"
+cleanup: true
