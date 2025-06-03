@@ -1,0 +1,21 @@
+---
+- name: Check Python version
+  command: python3 --version
+  register: python_version
+  ignore_errors: true
+
+- name: Display Python version
+  debug:
+    msg: "Found Python version: {{ python_version.stdout }}"
+
+- name: Create virtual environment
+  command: python3 -m venv venv
+  args:
+    chdir: "{{ repos_dir }}/{{ repo_name }}"
+  when: python_version.rc == 0
+
+- name: Install requirements
+  pip:
+    requirements: "{{ repos_dir }}/{{ repo_name }}/requirements.txt"
+    virtualenv: "{{ repos_dir }}/{{ repo_name }}/venv"
+  when: python_version.rc == 0 

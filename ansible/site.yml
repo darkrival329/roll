@@ -1,0 +1,38 @@
+---
+- name: Process repositories
+  hosts: localhost
+  gather_facts: true
+  vars:
+    repos_dir: "{{ lookup('env', 'PWD') }}/repos"
+
+  tasks:
+    - name: Get list of repositories
+      find:
+        paths: "{{ repos_dir }}"
+        patterns: "*"
+        file_type: directory
+      register: repo_dirs
+
+    - name: Process each repository
+      include_tasks: process_repo.yml
+      loop: "{{ repo_dirs.files }}"
+      loop_control:
+        loop_var: repo
+      vars:
+        repo_name: "{{ repo.path | basename }}"
+        repo_path: "{{ repo.path }}"
+
+    - name: Include Java role if pom.xml exists
+      include_role:
+        name: java
+      when: "'pom.xml' in repo_files"
+
+    - name: Include Python role if requirements.txt exists
+      include_role:
+        name: python
+      when: "'requirements.txt' in repo_files"
+
+    - name: Include Node role if package.json exists
+      include_role:
+        name: node
+      when: "'package.json' in repo_files" 

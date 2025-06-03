@@ -1,0 +1,40 @@
+---
+- name: Check for dependency files
+  find:
+    paths: "{{ repo_path }}"
+    patterns: 
+      - "pom.xml"
+      - "requirements.txt"
+      - "package.json"
+    file_type: file
+  register: dep_files
+
+- name: Set repository type flags
+  set_fact:
+    has_java: "{{ 'pom.xml' in dep_files.files | map(attribute='path') | map('basename') | list }}"
+    has_python: "{{ 'requirements.txt' in dep_files.files | map(attribute='path') | map('basename') | list }}"
+    has_node: "{{ 'package.json' in dep_files.files | map(attribute='path') | map('basename') | list }}"
+
+- name: Display repository information
+  debug:
+    msg: |
+      Processing repository: {{ repo_name }}
+      Found files:
+      {% if has_java %}  - pom.xml{% endif %}
+      {% if has_python %}  - requirements.txt{% endif %}
+      {% if has_node %}  - package.json{% endif %}
+
+- name: Include Java role if pom.xml exists
+  include_role:
+    name: java
+  when: has_java
+
+- name: Include Python role if requirements.txt exists
+  include_role:
+    name: python
+  when: has_python
+
+- name: Include Node role if package.json exists
+  include_role:
+    name: node
+  when: has_node 

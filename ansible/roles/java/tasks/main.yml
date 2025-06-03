@@ -1,0 +1,15 @@
+---
+- name: Check Java version
+  command: java -version
+  register: java_version
+  ignore_errors: true
+
+- name: Display Java version
+  debug:
+    msg: "Found Java version: {{ java_version.stderr_lines[0] }}"
+
+- name: Run Maven clean install
+  command: mvn clean install
+  args:
+    chdir: "{{ repos_dir }}/{{ repo_name }}"
+  when: java_version.rc == 0 

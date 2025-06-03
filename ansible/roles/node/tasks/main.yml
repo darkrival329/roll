@@ -1,0 +1,21 @@
+---
+- name: Check Node version
+  command: node --version
+  register: node_version
+  ignore_errors: true
+
+- name: Display Node version
+  debug:
+    msg: "Found Node version: {{ node_version.stdout }}"
+
+- name: Install dependencies
+  npm:
+    path: "{{ repos_dir }}/{{ repo_name }}"
+    state: present
+  when: node_version.rc == 0
+
+- name: Run npm build
+  command: npm run build
+  args:
+    chdir: "{{ repos_dir }}/{{ repo_name }}"
+  when: node_version.rc == 0 
