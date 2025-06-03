@@ -8,14 +8,20 @@
   debug:
     msg: "Found Python version: {{ python_version.stdout }}"
 
+- name: Read requirements.txt
+  slurp:
+    src: "{{ repo_path }}/requirements.txt"
+  register: requirements_file
 
-- name: Show requirements.txt contents
-  command: cat "{{ repos_dir }}/{{ repo_name }}/requirements.txt"
-  register: req_contents
-  changed_when: false
-  ignore_errors: true
+- name: Set requirements list
+  set_fact:
+    requirements_list: "{{ requirements_file['content'] | b64decode | split('\n') | select('match', '^[^#\\s].*') | list }}"
 
-- name: Print requirements.txt
+- name: Print Python requirements
   debug:
-    msg: "{{ req_contents.stdout }}"
-  when: req_contents.stdout is defined 
+    msg: |
+      Python requirements for {{ repo_name }}:
+      {% for req in requirements_list %}
+        - {{ req }}
+      {% endfor %}
+  when: requirements_list | length > 0 

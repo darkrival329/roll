@@ -46,6 +46,11 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 	return resp, nil
 }
 
+// BaseURL returns the base URL of the GitLab instance
+func (c *Client) BaseURL() string {
+	return c.baseURL
+}
+
 func FetchGroupProjects(ctx context.Context, client *Client, group string) ([]config.RepoSpec, error) {
 	path := fmt.Sprintf("/api/v4/groups/%s/projects?per_page=100", group)
 	resp, err := client.doRequest(ctx, "GET", path, nil)
@@ -74,6 +79,7 @@ func FetchGroupProjects(ctx context.Context, client *Client, group string) ([]co
 		}
 		repos = append(repos, config.RepoSpec{
 			RepoPath: p.PathWithNamespace,
+			RoleName: "", // Will be detected during clone
 		})
 	}
 

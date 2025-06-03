@@ -4,6 +4,10 @@
   gather_facts: true
   vars:
     repos_dir: "{{ lookup('env', 'PWD') }}/repos"
+    changelog_filename: "CHANGELOG.md"
+    pom_namespace:
+      m: "maven blah"
+      # Add more mappings as needed
 
   tasks:
     - name: Get list of repositories
@@ -26,6 +30,7 @@
       loop: "{{ repo_dirs.files }}"
       loop_control:
         loop_var: repo
+        label: "{{ repo.path | basename }}"
       vars:
         repo_name: "{{ repo.path | basename }}"
         repo_path: "{{ repo.path }}"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
@@ -15,19 +16,8 @@ import (
 	"roller/gitlab"
 )
 
-// RepoType represents the type of project based on its dependency files
-type RepoType struct {
-	IsJava          bool
-	IsPython        bool
-	IsNode          bool
-	DependencyFiles []string
-}
-
 // detectRepoType checks for common dependency files in the repository
-func detectRepoType(repoPath string) (RepoType, error) {
-	var rt RepoType
-	var files []string
-
+func detectRepoType(repoPath string) (string, error) {
 	// Check for common dependency files
 	dependencyFiles := map[string]bool{
 		"pom.xml":          false,
@@ -48,23 +38,26 @@ func detectRepoType(repoPath string) (RepoType, error) {
 		if !info.IsDir() {
 			if _, exists := dependencyFiles[info.Name()]; exists {
 				dependencyFiles[info.Name()] = true
-				files = append(files, info.Name())
 			}
 		}
 		return nil
 	})
 
 	if err != nil {
-		return rt, fmt.Errorf("error scanning repository: %w", err)
+		return "", fmt.Errorf("error scanning repository: %w", err)
 	}
 
-	// Set the repo type based on found files
-	rt.IsJava = dependencyFiles["pom.xml"]
-	rt.IsPython = dependencyFiles["requirements.txt"]
-	rt.IsNode = dependencyFiles["package.json"]
-	rt.DependencyFiles = files
-
-	return rt, nil
+	// Determine the role based on found files
+	switch {
+	case dependencyFiles["pom.xml"]:
+		return "pom", nil
+	case dependencyFiles["requirements.txt"]:
+		return "pip", nil
+	case dependencyFiles["package.json"]:
+		return "node", nil
+	default:
+		return "", fmt.Errorf("no supported package manager found")
+	}
 }
 
 // cloneAndCreateBranch clones a single project into "repos/<name>" and creates a feature branch.
@@ -105,23 +98,11 @@ func cloneAndCreateBranch(ctx context.Context, token, baseURL, targetBranch, fea
 	}
 
 	// Detect repository type
-	repoType, err := detectRepoType(destDir)
+	role, err := detectRepoType(destDir)
 	if err != nil {
 		log.Printf("⚠️  Warning: Could not detect repository type for %s: %v", repoPath, err)
 	} else {
-		log.Printf("📦 Repository type for %s:", repoPath)
-		if repoType.IsJava {
-			log.Printf("   - Java (Maven)")
-		}
-		if repoType.IsPython {
-			log.Printf("   - Python")
-		}
-		if repoType.IsNode {
-			log.Printf("   - Node.js")
-		}
-		if len(repoType.DependencyFiles) > 0 {
-			log.Printf("   - Found dependency files: %v", repoType.DependencyFiles)
-		}
+		log.Printf("📦 Repository type for %s: %s", repoPath, role)
 	}
 
 	log.Printf("✅ Successfully prepared %s (feature: %s)", repoPath, featureBranch)
@@ -141,7 +122,65 @@ func cloneAndCreateBranch(ctx context.Context, token, baseURL, targetBranch, fea
 	return nil
 }
 
+// discoverAndExportProjects performs auto-discovery, determines roles, and exports to YAML
+func discoverAndExportProjects(ctx context.Context, client *gitlab.Client, group string, outputPath string) error {
+	// Fetch projects from GitLab group
+	log.Printf("🔍 Fetching projects from group: %s", group)
+	projects, err := gitlab.FetchGroupProjects(ctx, client, group)
+	if err != nil {
+		return fmt.Errorf("failed to fetch projects: %w", err)
+	}
+
+	// Create temporary directory for cloning
+	tempDir := filepath.Join("repos", "temp")
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir) // Clean up temp directory
+
+	// Process each project to determine its role
+	for i, proj := range projects {
+		// Clone the repository
+		cloneURL := fmt.Sprintf("%s/%s.git", client.BaseURL(), proj.RepoPath)
+		repoName := path.Base(proj.RepoPath)
+		destDir := filepath.Join(tempDir, repoName)
+
+		log.Printf("📥 Cloning %s to detect role", proj.RepoPath)
+		cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", cloneURL, destDir)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("⚠️  Warning: Failed to clone %s: %v", proj.RepoPath, err)
+			continue
+		}
+
+		// Detect role
+		role, err := detectRepoType(destDir)
+		if err != nil {
+			log.Printf("⚠️  Warning: Could not detect role for %s: %v", proj.RepoPath, err)
+			continue
+		}
+
+		// Update project with detected role
+		projects[i].RoleName = role
+		log.Printf("✅ Detected role for %s: %s", proj.RepoPath, role)
+	}
+
+	// Export projects to YAML
+	if err := config.ExportDiscoveredProjects(outputPath, projects); err != nil {
+		return fmt.Errorf("failed to export projects: %w", err)
+	}
+
+	log.Printf("✅ Successfully exported %d projects to %s", len(projects), outputPath)
+	return nil
+}
+
 func main() {
+	// Parse command line flags
+	discoverFlag := flag.Bool("discover", false, "Run in discovery mode to detect roles and export to YAML")
+	outputFlag := flag.String("output", "discovered_projects.yaml", "Output file for discovered projects (used with -discover)")
+	flag.Parse()
+
 	// 1. Load config: bail out immediately if it fails
 	cfg, err := config.LoadConfig("roller.yaml")
 	if err != nil {
@@ -168,10 +207,22 @@ func main() {
 	// 4. Initialize GitLab client
 	client := gitlab.NewClient(cfg, token)
 
+	// If in discovery mode, run discovery and exit
+	if *discoverFlag {
+		if cfg.AutoDiscover == nil || cfg.AutoDiscover.Group == "" {
+			log.Fatal("auto_discover.group must be specified in config for discovery mode")
+		}
+		ctx := context.Background()
+		if err := discoverAndExportProjects(ctx, client, cfg.AutoDiscover.Group, *outputFlag); err != nil {
+			log.Fatalf("Discovery failed: %v", err)
+		}
+		return
+	}
+
 	// 5. Fetch auto-discovered projects (if configured)
 	ctx := context.Background()
 	var autoProjects []config.RepoSpec
-	if cfg.AutoDiscover.Group != "" {
+	if cfg.AutoDiscover != nil && cfg.AutoDiscover.Group != "" {
 		log.Printf("🔍 Fetching auto-discovered projects from group: %s", cfg.AutoDiscover.Group)
 		autoProjects, err = gitlab.FetchGroupProjects(ctx, client, cfg.AutoDiscover.Group)
 		if err != nil {

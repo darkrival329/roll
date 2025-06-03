@@ -24,6 +24,17 @@
       {% if has_python %}  - requirements.txt{% endif %}
       {% if has_node %}  - package.json{% endif %}
 
+- name: "Read changelog for {{ repo_name }}"
+  slurp:
+    src: "{{ repo_path }}/{{ changelog_filename }}"
+  register: changelog_contents
+  ignore_errors: true
+
+- name: "Display changelog contents for {{ repo_name }}"
+  debug:
+    msg: "{{ changelog_contents['content'] | b64decode }}"
+  when: changelog_contents['content'] is defined
+
 - name: "Include Java role for {{ repo_name }} if pom.xml exists"
   include_role:
     name: java
@@ -37,4 +48,13 @@
 - name: "Include Node role for {{ repo_name }} if package.json exists"
   include_role:
     name: node
-  when: has_node 
+  when: has_node
+
+- name: "Update changelog for {{ repo_name }}"
+  blockinfile:
+    path: "{{ repo_path }}/{{ changelog_filename }}"
+    insertafter: "^## \\[Unreleased\\]"
+    block: |
+      ## [{{ new_version }}] - {{ ansible_date_time.iso8601 }}
+      - Updated dependency versions
+  when: new_version is defined 

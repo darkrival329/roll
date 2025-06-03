@@ -22,9 +22,9 @@ type Config struct {
 	TargetBranch  string            `yaml:"target_branch"`
 	AnsibleRoles  map[string]string `yaml:"ansible_roles"`
 	Projects      []RepoSpec        `yaml:"projects"`
-	AutoDiscover  struct {
+	AutoDiscover  *struct {
 		Group string `yaml:"group"`
-	} `yaml:"auto_discover"`
+	} `yaml:"auto_discover,omitempty"`
 	Cleanup bool `yaml:"cleanup"` // Whether to clean up cloned repositories after processing
 }
 
@@ -44,8 +44,10 @@ func (c *Config) Validate() error {
 	if c.TargetBranch == "" {
 		errs = append(errs, "target_branch is required")
 	}
-	if c.AutoDiscover.Group == "" {
-		errs = append(errs, "auto_discover.group is required")
+
+	// Validate that at least one source of projects is specified
+	if len(c.Projects) == 0 && (c.AutoDiscover == nil || c.AutoDiscover.Group == "") {
+		errs = append(errs, "either projects or auto_discover.group must be specified")
 	}
 
 	if len(errs) > 0 {
