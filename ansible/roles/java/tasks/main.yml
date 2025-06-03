@@ -8,8 +8,19 @@
   debug:
     msg: "Found Java version: {{ java_version.stderr_lines[0] }}"
 
-- name: Run Maven clean install
-  command: mvn clean install
-  args:
-    chdir: "{{ repos_dir }}/{{ repo_name }}"
-  when: java_version.rc == 0 
+# - name: Run Maven clean install
+#   command: mvn clean install
+#   args:
+#     chdir: "{{ repos_dir }}/{{ repo_name }}"
+#   when: java_version.rc == 0
+
+- name: Show pom.xml contents
+  command: cat "{{ repos_dir }}/{{ repo_name }}/pom.xml"
+  register: pom_contents
+  changed_when: false
+  ignore_errors: true
+
+- name: Print pom.xml
+  debug:
+    msg: "{{ pom_contents.stdout }}"
+  when: pom_contents.stdout is defined 

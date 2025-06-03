@@ -8,14 +8,14 @@
   debug:
     msg: "Found Python version: {{ python_version.stdout }}"
 
-- name: Create virtual environment
-  command: python3 -m venv venv
-  args:
-    chdir: "{{ repos_dir }}/{{ repo_name }}"
-  when: python_version.rc == 0
 
-- name: Install requirements
-  pip:
-    requirements: "{{ repos_dir }}/{{ repo_name }}/requirements.txt"
-    virtualenv: "{{ repos_dir }}/{{ repo_name }}/venv"
-  when: python_version.rc == 0 
+- name: Show requirements.txt contents
+  command: cat "{{ repos_dir }}/{{ repo_name }}/requirements.txt"
+  register: req_contents
+  changed_when: false
+  ignore_errors: true
+
+- name: Print requirements.txt
+  debug:
+    msg: "{{ req_contents.stdout }}"
+  when: req_contents.stdout is defined 

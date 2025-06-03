@@ -8,14 +8,25 @@
   debug:
     msg: "Found Node version: {{ node_version.stdout }}"
 
-- name: Install dependencies
-  npm:
-    path: "{{ repos_dir }}/{{ repo_name }}"
-    state: present
-  when: node_version.rc == 0
+# - name: Install dependencies
+#   npm:
+#     path: "{{ repos_dir }}/{{ repo_name }}"
+#     state: present
+#   when: node_version.rc == 0
 
-- name: Run npm build
-  command: npm run build
-  args:
-    chdir: "{{ repos_dir }}/{{ repo_name }}"
-  when: node_version.rc == 0 
+# - name: Run npm build
+#   command: npm run build
+#   args:
+#     chdir: "{{ repos_dir }}/{{ repo_name }}"
+#   when: node_version.rc == 0
+
+- name: Show package.json contents
+  command: cat "{{ repos_dir }}/{{ repo_name }}/package.json"
+  register: pkg_contents
+  changed_when: false
+  ignore_errors: true
+
+- name: Print package.json
+  debug:
+    msg: "{{ pkg_contents.stdout }}"
+  when: pkg_contents.stdout is defined 
