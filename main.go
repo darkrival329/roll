@@ -62,7 +62,7 @@ func detectRepoType(repoPath string) (string, error) {
 
 // cloneAndCreateBranch clones a single project into "repos/<name>" and creates a feature branch.
 // Returns an error if anything fails.
-func cloneAndCreateBranch(ctx context.Context, token, baseURL, targetBranch, featureBranch, repoPath string) error {
+func cloneAndCreateBranch(ctx context.Context, token, baseURL, targetBranch, featureBranch, repoPath string, runAnsible bool) error {
 	// Compute clone URL using net/url parsing
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
@@ -107,16 +107,20 @@ func cloneAndCreateBranch(ctx context.Context, token, baseURL, targetBranch, fea
 
 	log.Printf("✅ Successfully prepared %s (feature: %s)", repoPath, featureBranch)
 
-	// Run Ansible playbook
-	log.Printf("🔧 Running Ansible playbook for %s", repoPath)
-	cmd = exec.CommandContext(ctx, "ansible-playbook", filepath.Join("ansible", "site.yml"))
-	cmd.Dir = "." // Run from the workspace root
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		log.Printf("⚠️  Warning: Ansible playbook execution failed for %s: %v", repoPath, err)
+	// Run Ansible playbook only if requested
+	if runAnsible {
+		log.Printf("🔧 Running Ansible playbook for %s", repoPath)
+		cmd = exec.CommandContext(ctx, "ansible-playbook", filepath.Join("ansible", "site.yml"))
+		cmd.Dir = "." // Run from the workspace root
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("⚠️  Warning: Ansible playbook execution failed for %s: %v", repoPath, err)
+		} else {
+			log.Printf("✅ Successfully ran Ansible playbook for %s", repoPath)
+		}
 	} else {
-		log.Printf("✅ Successfully ran Ansible playbook for %s", repoPath)
+		log.Printf("⏭️  Skipping Ansible playbook execution for %s", repoPath)
 	}
 
 	return nil
@@ -179,6 +183,7 @@ func main() {
 	// Parse command line flags
 	discoverFlag := flag.Bool("discover", false, "Run in discovery mode to detect roles and export to YAML")
 	outputFlag := flag.String("output", "discovered_projects.yaml", "Output file for discovered projects (used with -discover)")
+	runAnsibleFlag := flag.Bool("ansible", true, "Run Ansible playbook after cloning (default: true)")
 	flag.Parse()
 
 	// 1. Load config: bail out immediately if it fails
@@ -243,11 +248,10 @@ func main() {
 	}
 
 	// 8. Set up a per-clone timeout: e.g., 2 minutes per repo
-
 	for _, proj := range allProjects {
 		// Create a child context with timeout
 		cloneCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		err := cloneAndCreateBranch(cloneCtx, token, cfg.GitlabURL, cfg.TargetBranch, cfg.FeatureBranch, proj.RepoPath)
+		err := cloneAndCreateBranch(cloneCtx, token, cfg.GitlabURL, cfg.TargetBranch, cfg.FeatureBranch, proj.RepoPath, *runAnsibleFlag)
 		cancel()
 
 		if err != nil {
