@@ -125,6 +125,19 @@ func cloneAndCreateBranch(ctx context.Context, token, baseURL, targetBranch, fea
 	}
 
 	log.Printf("✅ Successfully prepared %s (feature: %s)", repoPath, featureBranch)
+
+	// Run Ansible playbook
+	log.Printf("🔧 Running Ansible playbook for %s", repoPath)
+	cmd = exec.CommandContext(ctx, "ansible-playbook", filepath.Join("ansible", "site.yml"))
+	cmd.Dir = "." // Run from the workspace root
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Printf("⚠️  Warning: Ansible playbook execution failed for %s: %v", repoPath, err)
+	} else {
+		log.Printf("✅ Successfully ran Ansible playbook for %s", repoPath)
+	}
+
 	return nil
 }
 
