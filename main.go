@@ -6,8 +6,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"roller/config"
 	"roller/gitlab"
+	"strings"
 )
 
 func main() {
@@ -63,9 +65,13 @@ func main() {
 			continue
 		}
 
+		// Get the repository name from the path (last part after /)
+		repoName := proj.RepoPath[strings.LastIndex(proj.RepoPath, "/")+1:]
+		repoPath := filepath.Join("repos", repoName)
+
 		// Create and checkout the feature branch
 		cmd = exec.Command("git", "checkout", "-b", cfg.FeatureBranch)
-		cmd.Dir = "repos"
+		cmd.Dir = repoPath
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Printf("Failed to create feature branch for %s: %v\nOutput: %s", proj.RepoPath, err, string(output))
 			continue
