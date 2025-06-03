@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"roller/config"
@@ -49,6 +50,13 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 // BaseURL returns the base URL of the GitLab instance
 func (c *Client) BaseURL() string {
 	return c.baseURL
+}
+
+// CloneURL returns the base URL for git clone operations
+func (c *Client) CloneURL() string {
+	// Remove /api/v4 from the base URL if it exists
+	base := strings.TrimSuffix(c.baseURL, "/api/v4")
+	return base
 }
 
 func FetchGroupProjects(ctx context.Context, client *Client, group string) ([]config.RepoSpec, error) {

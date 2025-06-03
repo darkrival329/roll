@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -62,20 +61,8 @@ func detectRepoType(repoPath string) (string, error) {
 
 // cloneAndCreateBranch clones a single project into "repos/<name>" and creates a feature branch.
 // Returns an error if anything fails.
-func cloneAndCreateBranch(ctx context.Context, token, baseURL, targetBranch, featureBranch, repoPath string, runAnsible bool) error {
-	// Compute clone URL using net/url parsing
-	parsed, err := url.Parse(baseURL)
-	if err != nil {
-		return fmt.Errorf("invalid GitLab URL %q: %w", baseURL, err)
-	}
-	// Ensure scheme is https
-	if parsed.Scheme == "" {
-		parsed.Scheme = "https"
-	}
-	parsed.User = url.UserPassword("oauth2", token)
-	parsed.Path = path.Join(parsed.Path, repoPath) + ".git"
-	cloneURL := parsed.String()
-
+func cloneAndCreateBranch(ctx context.Context, client *gitlab.Client, token, targetBranch, featureBranch, repoPath string, runAnsible bool) error {
+	cloneURL := fmt.Sprintf("%s/%s.git", client.CloneURL(), repoPath)
 	repoName := path.Base(repoPath) // e.g., "myrepo" from "group/subgroup/myrepo"
 	destDir := filepath.Join("repos", repoName)
 
@@ -144,8 +131,8 @@ func discoverAndExportProjects(ctx context.Context, client *gitlab.Client, group
 
 	// Process each project to determine its role
 	for i, proj := range projects {
-		// Clone the repository
-		cloneURL := fmt.Sprintf("%s/%s.git", client.BaseURL(), proj.RepoPath)
+		// Clone the repository using the clone URL format
+		cloneURL := fmt.Sprintf("%s/%s.git", client.CloneURL(), proj.RepoPath)
 		repoName := path.Base(proj.RepoPath)
 		destDir := filepath.Join(tempDir, repoName)
 
@@ -251,7 +238,7 @@ func main() {
 	for _, proj := range allProjects {
 		// Create a child context with timeout
 		cloneCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		err := cloneAndCreateBranch(cloneCtx, token, cfg.GitlabURL, cfg.TargetBranch, cfg.FeatureBranch, proj.RepoPath, *runAnsibleFlag)
+		err := cloneAndCreateBranch(cloneCtx, client, token, cfg.TargetBranch, cfg.FeatureBranch, proj.RepoPath, *runAnsibleFlag)
 		cancel()
 
 		if err != nil {
