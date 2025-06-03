@@ -21,18 +21,4 @@
       vars:
         repo_name: "{{ repo.path | basename }}"
         repo_path: "{{ repo.path }}"
-
-    - name: Include Java role if pom.xml exists
-      include_role:
-        name: java
-      when: "'pom.xml' in repo_files"
-
-    - name: Include Python role if requirements.txt exists
-      include_role:
-        name: python
-      when: "'requirements.txt' in repo_files"
-
-    - name: Include Node role if package.json exists
-      include_role:
-        name: node
-      when: "'package.json' in repo_files" 
+      ignore_errors: true 
