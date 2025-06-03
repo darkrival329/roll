@@ -13,6 +13,14 @@
         file_type: directory
       register: repo_dirs
 
+    - name: Count total repositories
+      set_fact:
+        total_repos: "{{ repo_dirs.files | length }}"
+
+    - name: Display total repositories
+      debug:
+        msg: "Total repositories found: {{ total_repos }}"
+
     - name: Process each repository
       include_tasks: process_repo.yml
       loop: "{{ repo_dirs.files }}"

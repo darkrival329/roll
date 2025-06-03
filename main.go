@@ -192,7 +192,7 @@ func main() {
 	}
 
 	// 8. Set up a per-clone timeout: e.g., 2 minutes per repo
-	//    You could also add a global timeout; for now, do it per invocation.
+
 	for _, proj := range allProjects {
 		// Create a child context with timeout
 		cloneCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
