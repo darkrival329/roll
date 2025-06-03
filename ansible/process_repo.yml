@@ -1,5 +1,5 @@
 ---
-- name: Check for dependency files
+- name: "Check for dependency files in {{ repo_name }}"
   find:
     paths: "{{ repo_path }}"
     patterns: 
@@ -9,13 +9,13 @@
     file_type: file
   register: dep_files
 
-- name: Set repository type flags
+- name: "Set repository type flags for {{ repo_name }}"
   set_fact:
     has_java: "{{ 'pom.xml' in dep_files.files | map(attribute='path') | map('basename') | list }}"
     has_python: "{{ 'requirements.txt' in dep_files.files | map(attribute='path') | map('basename') | list }}"
     has_node: "{{ 'package.json' in dep_files.files | map(attribute='path') | map('basename') | list }}"
 
-- name: Display repository information
+- name: "Display repository information for {{ repo_name }}"
   debug:
     msg: |
       Processing repository: {{ repo_name }}
@@ -24,17 +24,17 @@
       {% if has_python %}  - requirements.txt{% endif %}
       {% if has_node %}  - package.json{% endif %}
 
-- name: Include Java role if pom.xml exists
+- name: "Include Java role for {{ repo_name }} if pom.xml exists"
   include_role:
     name: java
   when: has_java
 
-- name: Include Python role if requirements.txt exists
+- name: "Include Python role for {{ repo_name }} if requirements.txt exists"
   include_role:
     name: python
   when: has_python
 
-- name: Include Node role if package.json exists
+- name: "Include Node role for {{ repo_name }} if package.json exists"
   include_role:
     name: node
   when: has_node 
